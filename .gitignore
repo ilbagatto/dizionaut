@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VSCode settings
+.vscode/
+
+# Virtual environments
+.venv/
+.env
+.env.*
+
+# Poetry
+poetry.lock
+
+# Pytest
+.cache/
+*.cover
+coverage.*
+htmlcov/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Logs
+logs/
+*.log
+
+# Misc
+*.sqlite3
+*.db
