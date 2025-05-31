@@ -40,6 +40,7 @@ PYTHONPATH=src poetry run python -m dizionaut.main
 * [httpx](https://www.python-httpx.org/)
 * [python-dotenv](https://pypi.org/project/python-dotenv/)
 * [aiohttp](https://docs.aiohttp.org/)
+* [loguru](https://github.com/Delgan/loguru) — for structured logging
 
 ---
 

@@ -5,6 +5,8 @@ from aiogram.types import Update
 from aiohttp import web
 from dotenv import load_dotenv
 
+from .logger import logger
+
 load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -16,11 +18,12 @@ dp = Dispatcher()
 
 @dp.message()
 async def echo_handler(message: types.Message):
-    await message.answer(f"Вы сказали: {message.text}")
+    await message.answer(f"You said: {message.text}")
 
 # Webhook handlers
 async def webhook_handler(request: web.Request):
-    data = await request.json()
+    data = await request.json
+    # Convert raw JSON to Update object and feed it into the dispatcher
     update = Update.model_validate(data)
     await dp.feed_update(bot, update)
     return web.Response(text="OK")
@@ -29,6 +32,7 @@ async def on_startup(app):
     await bot.set_webhook(WEBHOOK_URL + "/webhook")
 
 async def on_shutdown(app):
+    logger.info("Shutting down...")
     await bot.delete_webhook()
     await bot.session.close()
 
@@ -40,11 +44,16 @@ def run_webhook():
     web.run_app(app, port=8080)
 
 async def run_polling():
+    # Disable webhook to switch to polling mode
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
+
 if __name__ == "__main__":
+    logger.info(f"Running in {MODE!r} mode")
     if MODE == "webhook":
+        logger.info("Starting webhook server...")
         run_webhook()
     else:
+        logger.info("Starting polling...")
         asyncio.run(run_polling())
