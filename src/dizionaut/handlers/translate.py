@@ -1,8 +1,12 @@
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from aiogram.filters import Command
 from loguru import logger
+
+from .errors import handle_error_state
+
+from ..services.api import TranslationError, translate_text
 
 from ..states import TranslateState
 
@@ -76,31 +80,32 @@ async def handle_to_lang(callback: types.CallbackQuery, state: FSMContext):
 
 
 @router.message(TranslateState.word)
-async def handle_word_input(message: types.Message, state: FSMContext):
+async def handle_word_input(message: Message, state: FSMContext):
     data = await state.get_data()
     from_lang = data.get("from_lang")
     to_lang = data.get("to_lang")
-    from_lang_name = get_lang_name(from_lang)
-    to_lang_name = get_lang_name(to_lang)
-
     word = message.text.strip()
 
-    logger.info(f"Translating '{word}' from {from_lang} to {to_lang}")
+    logger.info(f"User input: '{word}' ({from_lang} → {to_lang})")
 
-    # Placeholder: here will be Glosbe API call
     try:
-        translations = ["Example1", "Example2"]  # Replace with actual result
-        if translations:
-            result = "\n".join(f"- {t}" for t in translations)
-            await message.answer(
-                f'Translation of "{word}" from {from_lang_name} to {to_lang_name}:\n{result}'
-            )
-        else:
-            await message.answer("No translation found.")
-    except Exception as e:
-        logger.exception("Error during translation")
-        await message.answer(
-            "⚠️ An error occurred while translating. Please try again later."
+        matches = await translate_text(from_lang, to_lang, word)
+
+        formatted = "\n".join(
+            f"• {m['translation']} ({int(m['match'] * 100)}%)" for m in matches
         )
 
-    await state.clear()
+        await message.answer(f"🔤 Translations for '{word}':\n{formatted}")
+        logger.info(f"Displayed {len(matches)} results for '{word}'")
+
+    except TranslationError as e:
+        logger.warning(f"Translation error: {e}")
+        await message.answer(str(e))
+        await state.set_state(TranslateState.error)
+        await handle_error_state(message, state)
+    except Exception:
+        logger.exception("Unexpected error during translation")
+        await state.set_state(TranslateState.error)
+        await handle_error_state(message, state)
+
+    

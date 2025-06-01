@@ -6,3 +6,4 @@ class TranslateState(StatesGroup):
     from_lang = State()
     to_lang = State()
     word = State()
+    error = State()

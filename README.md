@@ -1,6 +1,7 @@
 # Dizionaut
 
-**Dizionaut** is a Telegram bot for translating words and expressions using the [Glosbe API](https://glosbe.com/).
+**Dizionaut** is a Telegram bot for translating words and expressions using the [MyMemory API](https://mymemory.translated.net/).
+
 
 The project is written in Python with `aiogram` and supports two execution modes:
 
