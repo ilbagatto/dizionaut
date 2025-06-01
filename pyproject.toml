@@ -17,6 +17,10 @@ dependencies = [
 [tool.poetry]
 packages = [{include = "dizionaut", from = "src"}]
 
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-ra -q"
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"

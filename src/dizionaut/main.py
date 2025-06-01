@@ -6,6 +6,9 @@ from aiohttp import web
 from dotenv import load_dotenv
 
 from .logger import logger
+from .handlers import translate, start
+
+
 
 load_dotenv()
 
@@ -15,10 +18,8 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
-
-@dp.message()
-async def echo_handler(message: types.Message):
-    await message.answer(f"You said: {message.text}")
+dp.include_router(translate.router)
+dp.include_router(start.router)
 
 # Webhook handlers
 async def webhook_handler(request: web.Request):
