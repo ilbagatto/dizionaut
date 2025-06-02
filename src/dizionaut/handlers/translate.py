@@ -1,8 +1,19 @@
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    Message,
+    CallbackQuery,
+)
 from aiogram.filters import Command
 from loguru import logger
+
+from ..services.scoring import quality_marker
+
+from .success import handle_success_state
+
+from ..utils import format_ml
 
 from .errors import handle_error_state
 
@@ -13,16 +24,22 @@ from ..states import TranslateState
 router = Router()
 
 # Supported languages with flags
-LANGUAGES = [
-    ("🇷🇺 Russian", "ru"),
-    ("🇬🇧 English", "en"),
-    ("🇩🇪 German", "de"),
-    ("🇫🇷 French", "fr"),
-    ("🇮🇹 Italian", "it"),
-    ("🇪🇸 Spanish", "es"),
+LANGUAGES = (
     ("🇧🇬 Bulgarian", "bg"),
+    ("🇨🇿 Czech", "cs"),
+    ("🇬🇧 English", "en"),
+    ("🇫🇷 French", "fr"),
+    ("🇩🇪 German", "de"),
+    ("🇭🇷 Croatian", "hr"),
+    ("🇮🇹 Italian", "it"),
+    ("🇵🇱 Polish", "pl"),
+    ("🇵🇹 Portuguese", "pt"),
+    ("🇷🇺 Russian", "ru"),
     ("🇷🇸 Serbian", "sr"),
-]
+    ("🇸🇰 Slovak", "sk"),
+    ("🇪🇸 Spanish", "es"),
+    ("🇺🇦 Ukrainian", "uk"),
+)
 
 
 def get_lang_name(lang_code):
@@ -30,22 +47,29 @@ def get_lang_name(lang_code):
     return lang_name
 
 
-def language_keyboard(prefix: str) -> InlineKeyboardMarkup:
+def language_keyboard(prefix: str, excluded_code: str = None) -> InlineKeyboardMarkup:
+
+    def is_enabled(code: str) -> bool:
+        return code != excluded_code if excluded_code is not None else True
+
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=name, callback_data=f"{prefix}:{code}")]
             for name, code in LANGUAGES
+            if is_enabled(code)
         ]
     )
 
 
-@router.message(Command("translate"))
-async def start_translation(message: types.Message, state: FSMContext):
+@router.callback_query(F.data == "translate")
+async def start_translation(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await message.answer(
+    await callback.message.edit_text(
         "Please select source language:", reply_markup=language_keyboard("from")
     )
     await state.set_state(TranslateState.from_lang)
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("from:"))
@@ -54,8 +78,14 @@ async def handle_from_lang(callback: types.CallbackQuery, state: FSMContext):
     lang_name = get_lang_name(lang_code)
     await state.update_data(from_lang=lang_code)
     await callback.message.edit_text(
-        f"Source language: {lang_name}\nNow select target language:",
-        reply_markup=language_keyboard("to"),
+        format_ml(
+            f"""
+            Source language: {lang_name}.
+                  
+            Now select target language:
+            """
+        ),
+        reply_markup=language_keyboard("to", excluded_code=lang_code),
     )
     await state.set_state(TranslateState.to_lang)
     await callback.answer()
@@ -73,10 +103,25 @@ async def handle_to_lang(callback: types.CallbackQuery, state: FSMContext):
     to_lang_name = get_lang_name(to_lang)
 
     await callback.message.edit_text(
-        f"Source language: {from_lang_name}\nTarget language: {to_lang_name}\nEnter the word or phrase you want to translate:"
+        format_ml(
+            f"""
+        Source language: {from_lang_name}
+        Target language: {to_lang_name}
+        
+        Enter the word you want to translate:
+        """
+        )
     )
     await state.set_state(TranslateState.word)
     await callback.answer()
+
+
+def format_translation_list(results: list[tuple[dict, float]]) -> str:
+    lines = [
+        f"{quality_marker(score)} {entry['translation']} ({int(score * 100)}%)"
+        for entry, score in results
+    ]
+    return "🔤 Translations:\n\n" + "\n".join(lines)
 
 
 @router.message(TranslateState.word)
@@ -87,25 +132,21 @@ async def handle_word_input(message: Message, state: FSMContext):
     word = message.text.strip()
 
     logger.info(f"User input: '{word}' ({from_lang} → {to_lang})")
-
     try:
-        matches = await translate_text(from_lang, to_lang, word)
-
-        formatted = "\n".join(
-            f"• {m['translation']} ({int(m['match'] * 100)}%)" for m in matches
-        )
-
-        await message.answer(f"🔤 Translations for '{word}':\n{formatted}")
-        logger.info(f"Displayed {len(matches)} results for '{word}'")
-
-    except TranslationError as e:
-        logger.warning(f"Translation error: {e}")
+        try:
+            matches = await translate_text(from_lang, to_lang, word)
+            formatted = format_translation_list(matches)
+            await message.answer(formatted)
+            logger.info(f"Displayed {len(matches)} results for '{word}'")
+            await state.set_state(TranslateState.success)
+            await handle_success_state(message, state)
+        except TranslationError as e:
+            logger.warning(f"Translation error: {e}")
+            raise e
+        except Exception as e:
+            logger.exception("Unexpected error during translation")
+            raise e
+    except Exception as e:
         await message.answer(str(e))
         await state.set_state(TranslateState.error)
         await handle_error_state(message, state)
-    except Exception:
-        logger.exception("Unexpected error during translation")
-        await state.set_state(TranslateState.error)
-        await handle_error_state(message, state)
-
-    

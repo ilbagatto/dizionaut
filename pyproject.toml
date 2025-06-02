@@ -1,7 +1,7 @@
 [project]
 name = "dizionaut"
 version = "0.1.0"
-description = "Telegram bot for word translation using Glosbe API"
+description = "Telegram bot for word translation using MyMemory API"
 authors = [
     {name = "ilbagatto",email = "sergei.krushinski@gmail.com"}
 ]

@@ -6,7 +6,7 @@ from aiohttp import web
 from dotenv import load_dotenv
 
 from .logger import logger
-from .handlers import translate, start, errors
+from .handlers import translate, start, errors, success
 
 
 
@@ -21,6 +21,7 @@ dp = Dispatcher()
 dp.include_router(translate.router)
 dp.include_router(start.router)
 dp.include_router(errors.router)
+dp.include_router(success.router)
 
 # Webhook handlers
 async def webhook_handler(request: web.Request):
